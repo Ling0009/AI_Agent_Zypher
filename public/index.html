@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Zypher Market Research Agent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      max-width: 1000px;
+      margin: 24px auto;
+      padding: 0 16px;
+      background: #fafafa;
+    }
+
+    h1 { margin-bottom: 4px; }
+    .muted { color: #666; font-size: 13px; }
+
+    .card {
+      background: white;
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    textarea, input {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 10px 14px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: none;
+      background: #111;
+      color: white;
+      cursor: pointer;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tab {
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      background: #f3f3f3;
+    }
+
+    .tab.active {
+      background: #111;
+      color: white;
+      border-color: #111;
+    }
+
+    .hidden { display: none; }
+
+    /* ===== Progress ===== */
+
+    .progress {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #444;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #ccc;
+      border-top-color: #111;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ===== Output ===== */
+
+    .summary {
+      background: #f6f6f6;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+    }
+
+    .summary ul {
+      margin: 8px 0 0 18px;
+    }
+
+    .section {
+      border-top: 1px solid #eee;
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+
+    .section h3 {
+      cursor: pointer;
+      font-size: 15px;
+      margin: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-content {
+      margin-top: 8px;
+      font-size: 14px;
+      white-space: pre-wrap;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .collapsed .section-content {
+      display: none;
+    }
+
+    pre {
+      max-height: 320px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      background: #f8f8f8;
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    .checkbox-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Zypher Market Research Agent</h1>
+  <div class="muted">Compare markets, products, and competitors using an AI agent.</div>
+
+  <!-- INPUT -->
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" id="tab-chat">Quick input</div>
+      <div class="tab" id="tab-advanced">Advanced input</div>
+    </div>
+
+    <!-- Quick -->
+    <div id="chat-box" style="margin-top:12px;">
+      <textarea id="chatInput" rows="4"
+        placeholder="e.g. Compare CoreSpeed with LangChain and CrewAI. Focus on competitive landscape and market opportunities."></textarea>
+    </div>
+
+    <!-- Advanced -->
+    <div id="advanced-box" class="hidden" style="margin-top:12px;">
+      <label><b>Market / Topic</b></label>
+      <input id="topic" />
+
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label><b>Product</b></label>
+          <input id="product" />
+        </div>
+        <div>
+          <label><b>Competitors</b></label>
+          <input id="competitors" placeholder="comma separated" />
+        </div>
+      </div>
+
+      <label style="margin-top:12px;"><b>What do you want to see?</b></label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" value="competitors" checked /> Competitor landscape</label>
+        <label><input type="checkbox" value="positioning" checked /> Product positioning</label>
+        <label><input type="checkbox" value="revenue" /> Revenue & pricing</label>
+        <label><input type="checkbox" value="users" /> User personas</label>
+        <label><input type="checkbox" value="opportunities" /> Market opportunities</label>
+      </div>
+    </div>
+
+    <button id="run" style="margin-top:14px;">Run research</button>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="card">
+    <b>Insights</b>
+    <div id="progress" class="progress"></div>
+    <div id="output" style="margin-top:12px;"></div>
+  </div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let mode = "chat";
+
+  $("tab-chat").onclick = () => switchMode("chat");
+  $("tab-advanced").onclick = () => switchMode("advanced");
+
+  function switchMode(m) {
+    mode = m;
+    $("tab-chat").classList.toggle("active", m === "chat");
+    $("tab-advanced").classList.toggle("active", m === "advanced");
+    $("chat-box").classList.toggle("hidden", m !== "chat");
+    $("advanced-box").classList.toggle("hidden", m !== "advanced");
+  }
+
+  $("run").onclick = async () => {
+    $("output").innerHTML = "";
+    showProgress("Planning research…");
+
+    let payload;
+    if (mode === "chat") {
+      payload = { freeform: $("chatInput").value.trim() };
+    } else {
+      const focus = Array.from(
+        document.querySelectorAll(".checkbox-group input:checked")
+      ).map(i => i.value);
+
+      payload = {
+        topic: $("topic").value.trim(),
+        product: $("product").value.trim(),
+        competitors: $("competitors").value
+          .split(",")
+          .map(s => s.trim())
+          .filter(Boolean),
+        focus
+      };
+    }
+
+    simulateProgress();
+
+    const res = await fetch("/api/research", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    $("progress").textContent = "Done";
+    renderOutput(data);
+  };
+
+  function renderOutput(data) {
+    const out = $("output");
+    out.innerHTML = "";
+
+    // Preferred structured response
+    if (data.summary && data.sections) {
+      out.innerHTML += `
+        <div class="summary">
+          <b>TL;DR</b>
+          <ul>${data.summary.map(s => `<li>${s}</li>`).join("")}</ul>
+        </div>
+      `;
+
+      data.sections.forEach((s, i) => {
+        const div = document.createElement("div");
+        div.className = "section" + (i > 0 ? " collapsed" : "");
+        div.innerHTML = `
+          <h3>${s.title}<span>▾</span></h3>
+          <div class="section-content">${s.content}</div>
+        `;
+        div.querySelector("h3").onclick = () =>
+          div.classList.toggle("collapsed");
+        out.appendChild(div);
+      });
+      return;
+    }
+
+    // Fallback: raw markdown, safely contained
+    out.innerHTML = `
+      <div class="section">
+        <h3>Full report<span>▾</span></h3>
+        <div class="section-content">
+          <pre>${data.markdown || data.error || "No output"}</pre>
+        </div>
+      </div>
+    `;
+  }
+
+  function showProgress(text) {
+    $("progress").innerHTML = `<span class="spinner"></span>${text}`;
+  }
+
+  function simulateProgress() {
+    const steps = [
+      "Identifying competitors…",
+      "Analyzing positioning…",
+      "Evaluating monetization…",
+      "Synthesizing insights…"
+    ];
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i >= steps.length) return clearInterval(interval);
+      showProgress(steps[i++]);
+    }, 1000);
+  }
+</script>
+</body>
+</html>
